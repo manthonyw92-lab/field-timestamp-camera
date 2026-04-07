@@ -2,9 +2,13 @@
 import 'dart:html' as html;
 import 'dart:typed_data';
 
-/// Web: triggers a browser download for the JPEG (and a second for the JSON).
+/// Web: triggers browser downloads for the JPEG and JSON.
+/// EXIF embedding is skipped on web (browser handles its own metadata).
 Future<void> savePhoto(
-    Uint8List jpgBytes, String metaJson, String filename) async {
+    Uint8List jpgBytes,
+    String metaJson,
+    String filename,
+    Map<String, String> exifAttrs) async {
   _download(jpgBytes, '$filename.jpg', 'image/jpeg');
   _download(
     Uint8List.fromList(metaJson.codeUnits),

@@ -250,8 +250,11 @@ class _CameraScreenState extends State<CameraScreen>
       // Build metadata JSON
       final metaJson = jsonEncode(_data!.toJson());
 
-      // Save (platform-specific)
-      await savePhoto(jpgBytes, metaJson, filename);
+      // Build EXIF attribute map for embedding into the JPEG
+      final exifAttrs = _buildExifAttrs();
+
+      // Save (platform-specific) — EXIF embedded on mobile, skipped on web
+      await savePhoto(jpgBytes, metaJson, filename, exifAttrs);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -605,6 +608,45 @@ class _CameraScreenState extends State<CameraScreen>
         ],
       ),
     );
+  }
+
+  // ── EXIF helpers ────────────────────────────────────────
+
+  /// Builds the EXIF attribute map to embed into the saved JPEG.
+  Map<String, String> _buildExifAttrs() {
+    final d = _data!;
+    final descParts = <String>[
+      d.userAddress,
+      if (d.jobId.isNotEmpty) 'Job: ${d.jobId}',
+      if (d.crew.isNotEmpty) 'Crew: ${d.crew}',
+      if (d.timeModified) '[TIME MODIFIED]',
+      if (d.addressModified) '[ADDRESS MODIFIED]',
+    ];
+    return {
+      // GPS coordinates
+      'GPSLatitude': _fmtGps(d.lat.abs()),
+      'GPSLatitudeRef': d.lat >= 0 ? 'N' : 'S',
+      'GPSLongitude': _fmtGps(d.lng.abs()),
+      'GPSLongitudeRef': d.lng >= 0 ? 'E' : 'W',
+      // Timestamps — DateTimeOriginal = displayed (possibly edited) time
+      'DateTimeOriginal':
+          DateFormat('yyyy:MM:dd HH:mm:ss').format(d.displayedTime),
+      'DateTimeDigitized':
+          DateFormat('yyyy:MM:dd HH:mm:ss').format(d.capturedTime),
+      'DateTime':
+          DateFormat('yyyy:MM:dd HH:mm:ss').format(d.displayedTime),
+      // Human-readable description (visible in file properties / Photos)
+      'ImageDescription': descParts.join(' | '),
+    };
+  }
+
+  /// Formats a decimal GPS coordinate as the rational string
+  /// expected by Android ExifInterface: "DDD/1,MM/1,SSSS/1000"
+  String _fmtGps(double coord) {
+    final deg = coord.floor();
+    final min = ((coord - deg) * 60).floor();
+    final sec = ((coord - deg - min / 60) * 3600 * 1000).round();
+    return '$deg/1,$min/1,$sec/1000';
   }
 
   // Cycles: auto → always → off → auto
