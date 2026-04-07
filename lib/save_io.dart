@@ -6,8 +6,8 @@ import 'package:path_provider/path_provider.dart';
 /// Mobile / Desktop: saves JPEG to DCIM gallery + JSON sidecar to documents.
 Future<void> savePhoto(
     Uint8List jpgBytes, String metaJson, String filename) async {
-  // Save JPEG into the device gallery (DCIM on Android)
-  await Gal.putImageBytes(jpgBytes, name: filename);
+  // Save JPEG into the device gallery (DCIM/FieldCamera on Android)
+  await Gal.putImageBytes(jpgBytes, album: 'FieldCamera');
 
   // Save JSON sidecar alongside in the app documents directory
   final dir = await getApplicationDocumentsDirectory();
