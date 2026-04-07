@@ -137,6 +137,7 @@ class _CameraScreenState extends State<CameraScreen>
   bool _ready = false;
   bool _saving = false;
   String? _errorMessage;
+  FlashMode _flashMode = FlashMode.auto;
 
   final _addressCtrl = TextEditingController();
   final _jobCtrl = TextEditingController();
@@ -189,6 +190,7 @@ class _CameraScreenState extends State<CameraScreen>
       imageFormatGroup: ImageFormatGroup.jpeg,
     );
     await ctrl.initialize();
+    await ctrl.setFlashMode(_flashMode);
     _controller = ctrl;
     if (mounted) setState(() {});
   }
@@ -228,7 +230,11 @@ class _CameraScreenState extends State<CameraScreen>
     setState(() => _saving = true);
 
     try {
+      // Set chosen flash mode, take the photo, then immediately kill the flash
+      await _controller!.setFlashMode(_flashMode);
       final file = await _controller!.takePicture();
+      await _controller!.setFlashMode(FlashMode.off);
+      await _controller!.setFlashMode(_flashMode); // restore for next shot
       final rawBytes = await file.readAsBytes();
 
       // Decode, draw overlay, re-encode
@@ -529,37 +535,67 @@ class _CameraScreenState extends State<CameraScreen>
                       ),
                     ),
 
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 12),
 
-                    // Shutter button
-                    GestureDetector(
-                      onTap: _saving ? null : _takePhoto,
-                      child: Container(
-                        width: 74,
-                        height: 74,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _saving ? Colors.grey[600] : Colors.white,
-                          border: Border.all(
-                              color: Colors.white60,
-                              width: 4),
-                          boxShadow: const [
-                            BoxShadow(
-                                color: Colors.black38,
-                                blurRadius: 8,
-                                spreadRadius: 2)
-                          ],
+                    // Flash toggle + shutter row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Flash toggle button
+                        GestureDetector(
+                          onTap: _cycleFlash,
+                          child: Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.black45,
+                              border: Border.all(color: Colors.white24),
+                            ),
+                            child: Icon(
+                              _flashIcon(_flashMode),
+                              color: _flashMode == FlashMode.off
+                                  ? Colors.white38
+                                  : Colors.yellow,
+                              size: 24,
+                            ),
+                          ),
                         ),
-                        child: _saving
-                            ? const Padding(
-                                padding: EdgeInsets.all(20),
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.black54),
-                              )
-                            : const Icon(Icons.camera_alt,
-                                color: Colors.black87, size: 34),
-                      ),
+                        const SizedBox(width: 28),
+
+                        // Shutter button
+                        GestureDetector(
+                          onTap: _saving ? null : _takePhoto,
+                          child: Container(
+                            width: 74,
+                            height: 74,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _saving ? Colors.grey[600] : Colors.white,
+                              border: Border.all(
+                                  color: Colors.white60, width: 4),
+                              boxShadow: const [
+                                BoxShadow(
+                                    color: Colors.black38,
+                                    blurRadius: 8,
+                                    spreadRadius: 2)
+                              ],
+                            ),
+                            child: _saving
+                                ? const Padding(
+                                    padding: EdgeInsets.all(20),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.black54),
+                                  )
+                                : const Icon(Icons.camera_alt,
+                                    color: Colors.black87, size: 34),
+                          ),
+                        ),
+
+                        // Spacer to balance the flash button on the left
+                        const SizedBox(width: 76),
+                      ],
                     ),
                   ],
                 ),
@@ -569,6 +605,29 @@ class _CameraScreenState extends State<CameraScreen>
         ],
       ),
     );
+  }
+
+  // Cycles: auto → always → off → auto
+  void _cycleFlash() {
+    final next = {
+      FlashMode.auto: FlashMode.always,
+      FlashMode.always: FlashMode.off,
+      FlashMode.off: FlashMode.auto,
+    }[_flashMode]!;
+    _controller?.setFlashMode(next);
+    setState(() => _flashMode = next);
+  }
+
+  IconData _flashIcon(FlashMode mode) {
+    switch (mode) {
+      case FlashMode.always:
+        return Icons.flash_on;
+      case FlashMode.off:
+        return Icons.flash_off;
+      case FlashMode.auto:
+      default:
+        return Icons.flash_auto;
+    }
   }
 
   Widget _field({
