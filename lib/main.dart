@@ -613,6 +613,8 @@ class _CameraScreenState extends State<CameraScreen>
   // ── EXIF helpers ────────────────────────────────────────
 
   /// Builds the EXIF attribute map to embed into the saved JPEG.
+  /// native_exif 0.5.x expects GPS as signed decimal degree strings
+  /// and calls setLatLong() internally — no Ref tags needed.
   Map<String, String> _buildExifAttrs() {
     final d = _data!;
     final descParts = <String>[
@@ -623,11 +625,9 @@ class _CameraScreenState extends State<CameraScreen>
       if (d.addressModified) '[ADDRESS MODIFIED]',
     ];
     return {
-      // GPS coordinates
-      'GPSLatitude': _fmtGps(d.lat.abs()),
-      'GPSLatitudeRef': d.lat >= 0 ? 'N' : 'S',
-      'GPSLongitude': _fmtGps(d.lng.abs()),
-      'GPSLongitudeRef': d.lng >= 0 ? 'E' : 'W',
+      // GPS — signed decimal degrees; plugin calls setLatLong() internally
+      'GPSLatitude': d.lat.toString(),
+      'GPSLongitude': d.lng.toString(),
       // Timestamps — DateTimeOriginal = displayed (possibly edited) time
       'DateTimeOriginal':
           DateFormat('yyyy:MM:dd HH:mm:ss').format(d.displayedTime),
@@ -638,15 +638,6 @@ class _CameraScreenState extends State<CameraScreen>
       // Human-readable description (visible in file properties / Photos)
       'ImageDescription': descParts.join(' | '),
     };
-  }
-
-  /// Formats a decimal GPS coordinate as the rational string
-  /// expected by Android ExifInterface: "DDD/1,MM/1,SSSS/1000"
-  String _fmtGps(double coord) {
-    final deg = coord.floor();
-    final min = ((coord - deg) * 60).floor();
-    final sec = ((coord - deg - min / 60) * 3600 * 1000).round();
-    return '$deg/1,$min/1,$sec/1000';
   }
 
   // Cycles: auto → always → off → auto
