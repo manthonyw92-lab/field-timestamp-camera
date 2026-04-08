@@ -98,12 +98,12 @@ void main() {
   // ---------------------------------------------------------------------------
   // Save to assets/launcher_icon.png (relative to project root, one level up)
   // ---------------------------------------------------------------------------
-  final assetsDir = Directory('../assets');
+  final assetsDir = Directory('assets');
   if (!assetsDir.existsSync()) {
     assetsDir.createSync(recursive: true);
   }
 
-  final outFile = File('../assets/launcher_icon.png');
+  final outFile = File('assets/launcher_icon.png');
   outFile.writeAsBytesSync(img.encodePng(image));
 
   print('✓ Icon saved to assets/launcher_icon.png');
