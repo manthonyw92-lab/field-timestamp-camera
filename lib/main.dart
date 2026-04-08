@@ -95,6 +95,12 @@ class PhotoData {
 }
 
 // ──────────────────────────────────────────────────────────
+// Overlay background style
+// ──────────────────────────────────────────────────────────
+
+enum OverlayBg { black, white, none }
+
+// ──────────────────────────────────────────────────────────
 // Geocoding via Nominatim (works on all platforms)
 // ──────────────────────────────────────────────────────────
 
@@ -137,7 +143,15 @@ class _CameraScreenState extends State<CameraScreen>
   bool _ready = false;
   bool _saving = false;
   String? _errorMessage;
+
   FlashMode _flashMode = FlashMode.auto;
+
+  // Overlay position as fraction [0–1] of the photo dimensions.
+  // Default: bottom-left area.
+  Offset _overlayAnchor = const Offset(0.02, 0.70);
+
+  // Overlay background style.
+  OverlayBg _overlayBg = OverlayBg.black;
 
   final _addressCtrl = TextEditingController();
   final _jobCtrl = TextEditingController();
@@ -196,7 +210,6 @@ class _CameraScreenState extends State<CameraScreen>
   }
 
   Future<void> _initLocation() async {
-    // Permission (mobile only — web uses browser prompt)
     if (!kIsWeb) {
       final perm = await Geolocator.requestPermission();
       if (perm == LocationPermission.denied ||
@@ -204,14 +217,11 @@ class _CameraScreenState extends State<CameraScreen>
         throw Exception('Location permission denied.');
       }
     }
-
     final pos = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
     );
-
     final address = await reverseGeocode(pos.latitude, pos.longitude);
     final now = DateTime.now();
-
     _data = PhotoData(
       capturedTime: now,
       displayedTime: now,
@@ -230,59 +240,108 @@ class _CameraScreenState extends State<CameraScreen>
     setState(() => _saving = true);
 
     try {
-      // Set chosen flash mode, take the photo, then immediately kill the flash
       await _controller!.setFlashMode(_flashMode);
       final file = await _controller!.takePicture();
       await _controller!.setFlashMode(FlashMode.off);
-      await _controller!.setFlashMode(_flashMode); // restore for next shot
+      await _controller!.setFlashMode(_flashMode);
       final rawBytes = await file.readAsBytes();
 
-      // Decode, draw overlay, re-encode
       final decoded = img.decodeImage(rawBytes);
       if (decoded == null) throw Exception('Could not decode image.');
       _drawOverlay(decoded);
-      final jpgBytes = Uint8List.fromList(img.encodeJpg(decoded, quality: 88));
+      final jpgBytes =
+          Uint8List.fromList(img.encodeJpg(decoded, quality: 88));
 
-      // Build filename
       final ts = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
       final filename = 'field_$ts';
-
-      // Build metadata JSON
       final metaJson = jsonEncode(_data!.toJson());
-
-      // Build EXIF attribute map for embedding into the JPEG
       final exifAttrs = _buildExifAttrs();
 
-      // Save (platform-specific) — EXIF embedded on mobile, skipped on web
       await savePhoto(jpgBytes, metaJson, filename, exifAttrs);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(kIsWeb
-                ? 'Photo downloaded to your Downloads folder.'
-                : 'Photo saved: $filename.jpg'),
-            backgroundColor: Colors.green[700],
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(kIsWeb
+              ? 'Photo downloaded to your Downloads folder.'
+              : 'Photo saved: $filename.jpg'),
+          backgroundColor: Colors.green[700],
+        ));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red[700],
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red[700],
+        ));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
+  // ── Overlay rendering ────────────────────────────────────
+
+  /// Burns the metadata overlay into [image] at the position and style
+  /// chosen by the user.
   void _drawOverlay(img.Image image) {
+    final lines = _buildOverlayLines();
+
+    const lineH = 30;
+    const padH = 14;
+    const padV = 10;
+
+    final boxH = lines.length * lineH + padV * 2;
+    final maxLen = lines.fold(0, (m, l) => l.length > m ? l.length : m);
+    final boxW = (maxLen * 13.5 + padH * 2).round().clamp(180, image.width - 20);
+
+    // Map [0–1] anchor to pixel coordinates and clamp to image bounds.
+    var boxX = (image.width * _overlayAnchor.dx).round();
+    var boxY = (image.height * _overlayAnchor.dy).round();
+    boxX = boxX.clamp(0, image.width - boxW);
+    boxY = boxY.clamp(0, image.height - boxH);
+
+    // Background
+    if (_overlayBg != OverlayBg.none) {
+      for (var py = boxY; py < (boxY + boxH).clamp(0, image.height); py++) {
+        for (var px = boxX; px < (boxX + boxW).clamp(0, image.width); px++) {
+          final o = image.getPixel(px, py);
+          if (_overlayBg == OverlayBg.black) {
+            image.setPixel(px, py, img.ColorRgba8(
+              (o.r * 0.2).round(), (o.g * 0.2).round(), (o.b * 0.2).round(), 255));
+          } else {
+            // White — brighten toward white
+            image.setPixel(px, py, img.ColorRgba8(
+              (o.r * 0.3 + 178).round().clamp(0, 255),
+              (o.g * 0.3 + 178).round().clamp(0, 255),
+              (o.b * 0.3 + 178).round().clamp(0, 255), 255));
+          }
+        }
+      }
+    }
+
+    // Text
+    final textColor = _overlayBg == OverlayBg.white
+        ? img.ColorRgba8(20, 20, 20, 255)
+        : img.ColorRgba8(255, 255, 255, 255);
+
+    for (var i = 0; i < lines.length; i++) {
+      final tx = boxX + padH;
+      final ty = boxY + padV + i * lineH;
+      if (_overlayBg == OverlayBg.none) {
+        // Drop shadow for readability with no background
+        img.drawString(image, lines[i],
+            font: img.arial24,
+            x: tx + 2, y: ty + 2,
+            color: img.ColorRgba8(0, 0, 0, 200));
+      }
+      img.drawString(image, lines[i],
+          font: img.arial24, x: tx, y: ty, color: textColor);
+    }
+  }
+
+  List<String> _buildOverlayLines() {
     final d = _data!;
-    final lines = <String>[
+    return [
       'Time:  ${DateFormat('yyyy-MM-dd  HH:mm').format(d.displayedTime)}'
           '${d.timeModified ? '  [MODIFIED]' : ''}',
       'Taken: ${DateFormat('yyyy-MM-dd  HH:mm').format(d.capturedTime)}',
@@ -291,40 +350,6 @@ class _CameraScreenState extends State<CameraScreen>
       if (d.jobId.isNotEmpty) 'Job:   ${d.jobId}',
       if (d.crew.isNotEmpty) 'Crew:  ${d.crew}',
     ];
-
-    const lineH = 30;
-    const pad = 12;
-    final boxH = lines.length * lineH + pad * 2;
-    final boxY = image.height - boxH - 10;
-
-    // Semi-transparent dark background
-    for (var y = boxY; y < boxY + boxH; y++) {
-      for (var x = 10; x < image.width - 10; x++) {
-        final orig = image.getPixel(x, y);
-        image.setPixel(
-          x,
-          y,
-          img.ColorRgba8(
-            (orig.r * 0.3).round(),
-            (orig.g * 0.3).round(),
-            (orig.b * 0.3).round(),
-            255,
-          ),
-        );
-      }
-    }
-
-    // White text lines
-    for (var i = 0; i < lines.length; i++) {
-      img.drawString(
-        image,
-        lines[i],
-        font: img.arial24,
-        x: 20,
-        y: boxY + pad + i * lineH,
-        color: img.ColorRgba8(255, 255, 255, 255),
-      );
-    }
   }
 
   // ── Date / time picker ───────────────────────────────────
@@ -338,20 +363,13 @@ class _CameraScreenState extends State<CameraScreen>
       lastDate: DateTime(2100),
     );
     if (pickedDate == null || !mounted) return;
-
     final pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(d.displayedTime),
     );
     if (pickedTime == null) return;
-
-    final combined = DateTime(
-      pickedDate.year,
-      pickedDate.month,
-      pickedDate.day,
-      pickedTime.hour,
-      pickedTime.minute,
-    );
+    final combined = DateTime(pickedDate.year, pickedDate.month, pickedDate.day,
+        pickedTime.hour, pickedTime.minute);
     setState(() {
       d.displayedTime = combined;
       d.timeModified = combined.difference(d.capturedTime).inMinutes.abs() > 1;
@@ -410,12 +428,34 @@ class _CameraScreenState extends State<CameraScreen>
 
   Widget _cameraScreen() {
     final d = _data!;
+    final size = MediaQuery.of(context).size;
+
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
           // ── Camera preview ──
           CameraPreview(_controller!),
+
+          // ── Draggable overlay position handle ──
+          Positioned(
+            left: (size.width * _overlayAnchor.dx).clamp(0.0, size.width - 230),
+            top: (size.height * _overlayAnchor.dy).clamp(0.0, size.height - 110),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onPanUpdate: (details) {
+                setState(() {
+                  _overlayAnchor = Offset(
+                    (_overlayAnchor.dx + details.delta.dx / size.width)
+                        .clamp(0.0, 0.85),
+                    (_overlayAnchor.dy + details.delta.dy / size.height)
+                        .clamp(0.0, 0.87),
+                  );
+                });
+              },
+              child: _overlayPreviewWidget(),
+            ),
+          ),
 
           // ── Top bar: editable fields ──
           SafeArea(
@@ -468,7 +508,7 @@ class _CameraScreenState extends State<CameraScreen>
             ),
           ),
 
-          // ── Bottom bar: timestamp + capture ──
+          // ── Bottom bar: timestamp + controls ──
           Positioned(
             bottom: 0,
             left: 0,
@@ -505,10 +545,9 @@ class _CameraScreenState extends State<CameraScreen>
                           color: Colors.black54,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: d.timeModified
-                                ? Colors.orange
-                                : Colors.white24,
-                          ),
+                              color: d.timeModified
+                                  ? Colors.orange
+                                  : Colors.white24),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -540,33 +579,21 @@ class _CameraScreenState extends State<CameraScreen>
 
                     const SizedBox(height: 12),
 
-                    // Flash toggle + shutter row
+                    // Controls row: flash | shutter | bg-style
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Flash toggle button
-                        GestureDetector(
+                        // Flash toggle
+                        _iconButton(
+                          icon: _flashIcon(_flashMode),
+                          color: _flashMode == FlashMode.off
+                              ? Colors.white38
+                              : Colors.yellow,
                           onTap: _cycleFlash,
-                          child: Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.black45,
-                              border: Border.all(color: Colors.white24),
-                            ),
-                            child: Icon(
-                              _flashIcon(_flashMode),
-                              color: _flashMode == FlashMode.off
-                                  ? Colors.white38
-                                  : Colors.yellow,
-                              size: 24,
-                            ),
-                          ),
                         ),
                         const SizedBox(width: 28),
 
-                        // Shutter button
+                        // Shutter
                         GestureDetector(
                           onTap: _saving ? null : _takePhoto,
                           child: Container(
@@ -574,9 +601,10 @@ class _CameraScreenState extends State<CameraScreen>
                             height: 74,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: _saving ? Colors.grey[600] : Colors.white,
-                              border: Border.all(
-                                  color: Colors.white60, width: 4),
+                              color:
+                                  _saving ? Colors.grey[600] : Colors.white,
+                              border:
+                                  Border.all(color: Colors.white60, width: 4),
                               boxShadow: const [
                                 BoxShadow(
                                     color: Colors.black38,
@@ -596,8 +624,10 @@ class _CameraScreenState extends State<CameraScreen>
                           ),
                         ),
 
-                        // Spacer to balance the flash button on the left
-                        const SizedBox(width: 76),
+                        const SizedBox(width: 28),
+
+                        // Overlay background cycle
+                        _bgToggleButton(),
                       ],
                     ),
                   ],
@@ -610,11 +640,60 @@ class _CameraScreenState extends State<CameraScreen>
     );
   }
 
+  // ── Overlay preview widget (draggable handle) ────────────
+
+  Widget _overlayPreviewWidget() {
+    final textColor =
+        _overlayBg == OverlayBg.white ? Colors.black87 : Colors.white;
+    final bgColor = _overlayBg == OverlayBg.black
+        ? Colors.black54
+        : _overlayBg == OverlayBg.white
+            ? Colors.white70
+            : Colors.transparent;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.orange.withOpacity(0.7), width: 1.5),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Drag affordance row
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.drag_indicator,
+                  size: 11, color: Colors.orange),
+              const SizedBox(width: 3),
+              Text('DRAG',
+                  style: const TextStyle(
+                      color: Colors.orange,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8)),
+            ],
+          ),
+          const SizedBox(height: 3),
+          ..._buildOverlayLines().map((line) => Text(
+                line,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  height: 1.5,
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+
   // ── EXIF helpers ────────────────────────────────────────
 
-  /// Builds the EXIF attribute map to embed into the saved JPEG.
-  /// native_exif 0.5.x expects GPS as signed decimal degree strings
-  /// and calls setLatLong() internally — no Ref tags needed.
   Map<String, String> _buildExifAttrs() {
     final d = _data!;
     final descParts = <String>[
@@ -625,22 +704,19 @@ class _CameraScreenState extends State<CameraScreen>
       if (d.addressModified) '[ADDRESS MODIFIED]',
     ];
     return {
-      // GPS — signed decimal degrees; plugin calls setLatLong() internally
       'GPSLatitude': d.lat.toString(),
       'GPSLongitude': d.lng.toString(),
-      // Timestamps — DateTimeOriginal = displayed (possibly edited) time
       'DateTimeOriginal':
           DateFormat('yyyy:MM:dd HH:mm:ss').format(d.displayedTime),
       'DateTimeDigitized':
           DateFormat('yyyy:MM:dd HH:mm:ss').format(d.capturedTime),
-      'DateTime':
-          DateFormat('yyyy:MM:dd HH:mm:ss').format(d.displayedTime),
-      // Human-readable description (visible in file properties / Photos)
+      'DateTime': DateFormat('yyyy:MM:dd HH:mm:ss').format(d.displayedTime),
       'ImageDescription': descParts.join(' | '),
     };
   }
 
-  // Cycles: auto → always → off → auto
+  // ── Flash & overlay background helpers ──────────────────
+
   void _cycleFlash() {
     final next = {
       FlashMode.auto: FlashMode.always,
@@ -663,6 +739,60 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
+  void _cycleBg() =>
+      setState(() => _overlayBg =
+          OverlayBg.values[(_overlayBg.index + 1) % OverlayBg.values.length]);
+
+  Widget _bgToggleButton() {
+    final (icon, label, color) = switch (_overlayBg) {
+      OverlayBg.black => (Icons.rectangle, 'Dark', Colors.white70),
+      OverlayBg.white => (Icons.rectangle_outlined, 'Light', Colors.white70),
+      OverlayBg.none  => (Icons.hide_image_outlined, 'None', Colors.white38),
+    };
+    return GestureDetector(
+      onTap: _cycleBg,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black45,
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: color),
+            Text(label,
+                style: TextStyle(
+                    color: color, fontSize: 8, letterSpacing: 0.3)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Small reusable widgets ───────────────────────────────
+
+  Widget _iconButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.black45,
+            border: Border.all(color: Colors.white24),
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+      );
+
   Widget _field({
     required TextEditingController ctrl,
     required String hint,
@@ -681,8 +811,7 @@ class _CameraScreenState extends State<CameraScreen>
       );
 
   Widget _badge(String label, Color color) => Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: color.withOpacity(0.15),
           border: Border.all(color: color, width: 1),
