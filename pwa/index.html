@@ -24,7 +24,7 @@
     <div id="camera-view">
       <video id="preview" autoplay playsinline muted></video>
 
-      <!-- Draggable timestamp overlay -->
+      <!-- Draggable timestamp overlay (double-tap address line to edit) -->
       <div id="overlay-drag" data-bg="black">
         <div id="overlay-text"></div>
       </div>
@@ -32,17 +32,47 @@
       <!-- White flash on capture -->
       <div id="capture-flash"></div>
 
-      <!-- GPS / error status pill -->
+      <!-- GPS / status pill -->
       <div id="status-bar"></div>
     </div>
 
-    <!-- Bottom controls -->
+    <!-- Bottom controls: flash | gallery | shutter | bg -->
     <div id="controls">
-      <button id="flash-btn" class="ctrl-btn" title="Toggle flash" disabled>⚡</button>
-      <button id="shutter"   class="ctrl-btn shutter-btn" title="Take photo"></button>
-      <button id="bg-btn"    class="ctrl-btn" title="Overlay background">■</button>
+      <button id="flash-btn"   class="ctrl-btn" title="Toggle flash" disabled>⚡</button>
+      <button id="gallery-btn" class="ctrl-btn" title="Captured photos">
+        <span id="gallery-icon">📷</span>
+        <span id="gallery-badge" class="badge hidden">0</span>
+      </button>
+      <button id="shutter"     class="ctrl-btn shutter-btn" title="Take photo"></button>
+      <button id="bg-btn"      class="ctrl-btn" title="Overlay background">■</button>
     </div>
 
+  </div>
+
+  <!-- ── Address edit modal ───────────────────────────────────────────── -->
+  <div id="addr-modal" class="modal-backdrop hidden">
+    <div class="modal">
+      <p class="modal-title">Edit Address</p>
+      <input id="addr-input" type="text" placeholder="Enter address…" autocomplete="off">
+      <div class="modal-btns">
+        <button id="addr-gps-btn"    class="modal-btn secondary">Use GPS</button>
+        <button id="addr-cancel-btn" class="modal-btn secondary">Cancel</button>
+        <button id="addr-save-btn"   class="modal-btn primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Photo gallery panel ──────────────────────────────────────────── -->
+  <div id="gallery-panel" class="hidden">
+    <div class="gallery-header">
+      <span id="gallery-count">0 photos</span>
+      <div class="gallery-actions">
+        <button id="share-all-btn"  class="panel-btn primary">Share All</button>
+        <button id="clear-all-btn"  class="panel-btn danger">Clear</button>
+        <button id="close-gallery-btn" class="panel-btn icon">✕</button>
+      </div>
+    </div>
+    <div id="gallery-grid"></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.js"></script>
