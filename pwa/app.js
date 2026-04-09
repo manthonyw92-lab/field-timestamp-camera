@@ -12,6 +12,12 @@ let addressOverride = null;  // manually typed by user (null = use GPS address)
 let geocodePending = false;
 let capturedPhotos = [];     // { blob, filename, objectUrl }
 
+// Zoom
+let currentZoom    = 1;
+let minZoom        = 1;
+let maxZoom        = 8;
+let hwZoom         = false;   // true = hardware zoom via applyConstraints
+
 const BG_MODES = ['black', 'white', 'none'];
 const BG_ICONS = { black: '■', white: '□', none: '◇' };
 
@@ -19,7 +25,7 @@ const BG_ICONS = { black: '■', white: '□', none: '◇' };
 let video, overlayDiv, overlayTextEl, shutterBtn, flashBtn, bgBtn,
     galleryBtn, galleryBadge, statusBar, captureFlash,
     galleryPanel, galleryGrid, galleryCount,
-    addrModal, addrInput;
+    addrModal, addrInput, zoomPill;
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -38,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
   galleryCount   = document.getElementById('gallery-count');
   addrModal      = document.getElementById('addr-modal');
   addrInput      = document.getElementById('addr-input');
+  zoomPill       = document.getElementById('zoom-pill');
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     showStatus('Camera requires HTTPS — open via https://', 0);
@@ -48,6 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initGPS();
   initDrag();
   initDoubleTap();
+  initPinchZoom();
+  zoomPill.addEventListener('click', cycleZoomPreset);
   setInterval(updateOverlayPreview, 1000);
 
   shutterBtn.addEventListener('click',  capturePhoto);
@@ -88,12 +97,84 @@ async function initCamera() {
 
     const track = mediaStream.getVideoTracks()[0];
     const caps  = track.getCapabilities ? track.getCapabilities() : {};
+
     torchSupported = !!caps.torch;
     if (torchSupported) flashBtn.disabled = false;
+
+    // Hardware zoom support (Android Chrome)
+    if (caps.zoom) {
+      hwZoom   = true;
+      minZoom  = caps.zoom.min;
+      maxZoom  = caps.zoom.max;
+      currentZoom = caps.zoom.min;
+    } else {
+      hwZoom  = false;
+      minZoom = 1;
+      maxZoom = 8;
+      currentZoom = 1;
+    }
+    updateZoomPill();
 
   } catch (err) {
     showStatus('Camera error: ' + err.message, 0);
   }
+}
+
+// ─── Zoom ─────────────────────────────────────────────────────────────────────
+async function setZoom(z) {
+  currentZoom = Math.max(minZoom, Math.min(maxZoom, z));
+  if (hwZoom && mediaStream) {
+    try {
+      await mediaStream.getVideoTracks()[0].applyConstraints({ advanced: [{ zoom: currentZoom }] });
+    } catch (_) { /* ignore */ }
+  } else {
+    // CSS digital zoom — scale video, capture will crop centre
+    video.style.transform       = currentZoom > 1 ? `scale(${currentZoom})` : '';
+    video.style.transformOrigin = '50% 50%';
+  }
+  updateZoomPill();
+}
+
+function updateZoomPill() {
+  zoomPill.textContent = currentZoom.toFixed(1) + '×';
+  zoomPill.classList.toggle('zoomed', currentZoom > (minZoom + 0.05));
+}
+
+// Tap the pill to snap to preset levels: 1× → 2× → 4× → back to min
+function cycleZoomPreset() {
+  const presets = [minZoom, 2, 4].filter(p => p <= maxZoom);
+  if (presets[presets.length - 1] < maxZoom) presets.push(maxZoom);
+  const next = presets.find(p => p > currentZoom + 0.05) || presets[0];
+  setZoom(next);
+}
+
+// Pinch-to-zoom on the camera view
+function initPinchZoom() {
+  const view = document.getElementById('camera-view');
+  let startDist = null, startZoom = 1;
+
+  function dist(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  view.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      startDist = dist(e.touches);
+      startZoom = currentZoom;
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  view.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && startDist) {
+      setZoom(startZoom * dist(e.touches) / startDist);
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  view.addEventListener('touchend', () => { startDist = null; });
 }
 
 // ─── GPS ──────────────────────────────────────────────────────────────────────
@@ -291,7 +372,17 @@ async function capturePhoto() {
     canvas.width  = video.videoWidth  || 1920;
     canvas.height = video.videoHeight || 1080;
     const ctx     = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
+
+    if (!hwZoom && currentZoom > 1) {
+      // Crop the centre to simulate digital zoom for captured photo
+      const sw = canvas.width  / currentZoom;
+      const sh = canvas.height / currentZoom;
+      const sx = (canvas.width  - sw) / 2;
+      const sy = (canvas.height - sh) / 2;
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    } else {
+      ctx.drawImage(video, 0, 0);
+    }
 
     drawOverlay(ctx, canvas.width, canvas.height, buildLines());
 
