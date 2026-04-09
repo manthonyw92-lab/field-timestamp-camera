@@ -1,0 +1,173 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* ── Camera view ─────────────────────────────────────────────────────── */
+#camera-view {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background: #000;
+  min-height: 0;
+}
+
+#preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Draggable timestamp overlay ─────────────────────────────────────── */
+#overlay-drag {
+  position: absolute;
+  left: 2%;
+  top: 70%;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  max-width: 94vw;
+  transition: background 0.2s;
+  z-index: 10;
+}
+
+#overlay-drag:active { cursor: grabbing; }
+
+#overlay-drag[data-bg="black"] { background: rgba(0,   0,   0,   0.65); }
+#overlay-drag[data-bg="white"] { background: rgba(255, 255, 255, 0.75); }
+#overlay-drag[data-bg="none"]  { background: transparent; }
+
+#overlay-text {
+  font-size: clamp(11px, 2.8vw, 15px);
+  line-height: 1.65;
+  white-space: nowrap;
+}
+
+#overlay-drag[data-bg="black"] #overlay-text,
+#overlay-drag[data-bg="none"]  #overlay-text {
+  color: #fff;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+}
+
+#overlay-drag[data-bg="white"] #overlay-text {
+  color: #111;
+  text-shadow: none;
+}
+
+/* ── Status pill ─────────────────────────────────────────────────────── */
+#status-bar {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 12px;
+  padding: 3px 14px;
+  border-radius: 12px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s;
+  white-space: nowrap;
+  z-index: 20;
+}
+
+/* ── Capture flash ───────────────────────────────────────────────────── */
+#capture-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.08s;
+  z-index: 30;
+}
+
+/* ── Bottom controls ─────────────────────────────────────────────────── */
+#controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  padding: 14px 32px;
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+  background: #0f0f0f;
+  flex-shrink: 0;
+}
+
+.ctrl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: none;
+  background: #2c2c2e;
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.ctrl-btn:active  { transform: scale(0.90); }
+
+.ctrl-btn.active {
+  background: #f5a623;
+  color: #000;
+}
+
+.ctrl-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+/* Shutter button */
+.shutter-btn {
+  width: 72px;
+  height: 72px;
+  background: #fff;
+  border: 5px solid #888 !important;
+  font-size: 0;
+  position: relative;
+}
+
+.shutter-btn::after {
+  content: '';
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #ccc;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.shutter-btn:active { background: #d0d0d0 !important; }
+.shutter-btn:active::after { background: #d0d0d0; }

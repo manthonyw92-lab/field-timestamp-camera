@@ -1,0 +1,103 @@
+name: Deploy PWA
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Pillow
+        run: pip3 install Pillow
+
+      - name: Generate PWA icons
+        run: |
+          python3 - <<'PYEOF'
+          from PIL import Image, ImageDraw
+          import math, os
+
+          def make_icon(size):
+              s = size / 1024.0
+              img = Image.new('RGB', (size, size), (28, 42, 74))
+              d = ImageDraw.Draw(img)
+
+              # Camera body
+              d.rounded_rectangle(
+                  [int(162*s), int(290*s), int(862*s), int(770*s)],
+                  radius=max(4, int(70*s)), fill=(255, 255, 255)
+              )
+              # Viewfinder bump
+              d.rounded_rectangle(
+                  [int(390*s), int(210*s), int(634*s), int(310*s)],
+                  radius=max(2, int(28*s)), fill=(255, 255, 255)
+              )
+              # Lens outer (grey)
+              cx, cy = int(512*s), int(530*s)
+              r = int(178*s)
+              d.ellipse([cx-r, cy-r, cx+r, cy+r], fill=(200, 200, 200))
+              # Clock face (white)
+              r2 = int(160*s)
+              d.ellipse([cx-r2, cy-r2, cx+r2, cy+r2], fill=(255, 255, 255))
+              # Tick marks
+              for i in range(12):
+                  ang = (i * 30 - 90) * math.pi / 180
+                  major = (i % 3 == 0)
+                  ro = int(150*s)
+                  ri = int((132 if major else 142)*s)
+                  th = max(2, int((5 if major else 3)*s))
+                  x1 = cx + int(ro * math.cos(ang))
+                  y1 = cy + int(ro * math.sin(ang))
+                  x2 = cx + int(ri * math.cos(ang))
+                  y2 = cy + int(ri * math.sin(ang))
+                  d.line([x1, y1, x2, y2], fill=(28, 42, 74), width=th)
+              # Hour hand (10 o'clock = 300°)
+              a = (300 - 90) * math.pi / 180
+              hl = int(88*s)
+              d.line([cx, cy, cx + int(hl*math.cos(a)), cy + int(hl*math.sin(a))],
+                     fill=(28, 42, 74), width=max(2, int(10*s)))
+              # Minute hand (2 o'clock = 60°)
+              a = (60 - 90) * math.pi / 180
+              ml = int(128*s)
+              d.line([cx, cy, cx + int(ml*math.cos(a)), cy + int(ml*math.sin(a))],
+                     fill=(28, 42, 74), width=max(1, int(7*s)))
+              # Center dot
+              cd = max(3, int(12*s))
+              d.ellipse([cx-cd, cy-cd, cx+cd, cy+cd], fill=(28, 42, 74))
+              return img
+
+          os.makedirs('pwa/icons', exist_ok=True)
+          make_icon(512).save('pwa/icons/icon-512.png')
+          make_icon(192).save('pwa/icons/icon-192.png')
+          make_icon(180).save('pwa/icons/apple-touch-icon.png')
+          print('Icons generated.')
+          PYEOF
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pwa/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

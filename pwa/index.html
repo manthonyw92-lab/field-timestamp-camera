@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Field Timestamp Camera</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1C2A4A">
+
+  <!-- iOS home-screen -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FieldCam">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Camera viewport -->
+    <div id="camera-view">
+      <video id="preview" autoplay playsinline muted></video>
+
+      <!-- Draggable timestamp overlay -->
+      <div id="overlay-drag" data-bg="black">
+        <div id="overlay-text"></div>
+      </div>
+
+      <!-- White flash on capture -->
+      <div id="capture-flash"></div>
+
+      <!-- GPS / error status pill -->
+      <div id="status-bar"></div>
+    </div>
+
+    <!-- Bottom controls -->
+    <div id="controls">
+      <button id="flash-btn" class="ctrl-btn" title="Toggle flash" disabled>⚡</button>
+      <button id="shutter"   class="ctrl-btn shutter-btn" title="Take photo"></button>
+      <button id="bg-btn"    class="ctrl-btn" title="Overlay background">■</button>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
