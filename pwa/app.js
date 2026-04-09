@@ -250,13 +250,10 @@ function buildLines() {
 function updateOverlayPreview() {
   const lines = buildLines();
   const addr  = activeAddress();
-  const isCustom = addressOverride !== null;
-
   const html = lines.map((l, i) => {
     const isAddrLine = gpsPosition && addr && i === lines.length - 1 && l === addr;
     if (isAddrLine) {
-      const icon = isCustom ? '✏️' : '✏';
-      return `<div class="addr-line">${esc(l)}<span class="edit-addr" id="edit-addr-btn">${icon}</span></div>`;
+      return `<div class="addr-line">${esc(l)}<span class="edit-addr" id="edit-addr-btn">✏</span></div>`;
     }
     return `<div>${esc(l)}</div>`;
   }).join('');
