@@ -10,6 +10,7 @@ const STATIC = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
+  'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
   'https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.js',
 ];
 

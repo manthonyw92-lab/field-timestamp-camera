@@ -56,9 +56,10 @@ document.addEventListener('DOMContentLoaded', () => {
   galleryBtn.addEventListener('click',  openGallery);
 
   // Gallery panel
-  document.getElementById('close-gallery-btn').addEventListener('click', closeGallery);
-  document.getElementById('share-all-btn').addEventListener('click',     shareAll);
-  document.getElementById('clear-all-btn').addEventListener('click',     clearAll);
+  document.getElementById('close-gallery-btn').addEventListener('click',  closeGallery);
+  document.getElementById('share-all-btn').addEventListener('click',      shareAll);
+  document.getElementById('save-device-btn').addEventListener('click',    saveToDevice);
+  document.getElementById('clear-all-btn').addEventListener('click',      clearAll);
 
   // Address modal
   document.getElementById('addr-save-btn').addEventListener('click',   saveAddress);
@@ -398,6 +399,41 @@ async function shareFiles(files) {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
   showStatus(`Downloaded ${files.length} photo${files.length > 1 ? 's' : ''}`, 2000);
+}
+
+async function saveToDevice() {
+  if (capturedPhotos.length === 0) return;
+
+  if (capturedPhotos.length === 1) {
+    // Single photo — direct download
+    const p   = capturedPhotos[0];
+    const url = URL.createObjectURL(p.blob);
+    const a   = Object.assign(document.createElement('a'), { href: url, download: p.filename });
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    showStatus('Saved to device', 2000);
+    return;
+  }
+
+  // Multiple photos — bundle as ZIP
+  showStatus('Creating ZIP…', 0);
+  try {
+    const zip = new JSZip();
+    capturedPhotos.forEach(p => zip.file(p.filename, p.blob));
+    const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+    const zipName = 'FieldCam_' + fmtDateFilename(new Date()) + '.zip';
+    const url     = URL.createObjectURL(zipBlob);
+    const a       = Object.assign(document.createElement('a'), { href: url, download: zipName });
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    showStatus(`Saved ${capturedPhotos.length} photos as ZIP`, 3000);
+  } catch (err) {
+    showStatus('Save failed: ' + err.message, 4000);
+  }
 }
 
 function clearAll() {

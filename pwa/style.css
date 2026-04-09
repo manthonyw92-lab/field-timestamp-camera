@@ -315,6 +315,7 @@ html, body {
 }
 
 .panel-btn.primary { background: #0a84ff; color: #fff; }
+.panel-btn.save    { background: #30d158; color: #000; }
 .panel-btn.danger  { background: #3a3a3c; color: #ff453a; }
 .panel-btn.icon    { background: #3a3a3c; color: #fff; font-size: 16px; padding: 7px 11px; }
 .panel-btn:active  { opacity: 0.75; }
