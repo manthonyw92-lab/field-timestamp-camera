@@ -274,6 +274,15 @@ html, body {
 .modal input[type="text"]::placeholder { color: #888; }
 .modal input[type="text"]:focus { border-color: #0a84ff; }
 
+.modal-label {
+  color: #aaa;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: -6px;
+}
+
 .modal-btns {
   display: flex;
   gap: 8px;

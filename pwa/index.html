@@ -39,7 +39,7 @@
       <div id="status-bar"></div>
     </div>
 
-    <!-- Bottom controls: flash | gallery | shutter | bg -->
+    <!-- Bottom controls: flash | gallery | shutter | bg | job -->
     <div id="controls">
       <button id="flash-btn"   class="ctrl-btn" title="Toggle flash" disabled>⚡</button>
       <button id="gallery-btn" class="ctrl-btn" title="Captured photos">
@@ -48,6 +48,7 @@
       </button>
       <button id="shutter"     class="ctrl-btn shutter-btn" title="Take photo"></button>
       <button id="bg-btn"      class="ctrl-btn" title="Overlay background">■</button>
+      <button id="job-btn"     class="ctrl-btn" title="Job &amp; Crew">🪪</button>
     </div>
 
   </div>
@@ -61,6 +62,21 @@
         <button id="addr-gps-btn"    class="modal-btn secondary">Use GPS</button>
         <button id="addr-cancel-btn" class="modal-btn secondary">Cancel</button>
         <button id="addr-save-btn"   class="modal-btn primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Job & Crew modal ────────────────────────────────────────────── -->
+  <div id="job-modal" class="modal-backdrop hidden">
+    <div class="modal">
+      <p class="modal-title">Job &amp; Crew</p>
+      <label class="modal-label">Job Name</label>
+      <input id="job-input"  type="text" placeholder="e.g. Smith Residence #4521" autocomplete="off">
+      <label class="modal-label">Crew Name</label>
+      <input id="crew-input" type="text" placeholder="e.g. Martinez / Johnson" autocomplete="off">
+      <div class="modal-btns">
+        <button id="job-cancel-btn" class="modal-btn secondary">Cancel</button>
+        <button id="job-save-btn"   class="modal-btn primary">Save</button>
       </div>
     </div>
   </div>

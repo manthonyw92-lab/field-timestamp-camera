@@ -12,6 +12,10 @@ let addressOverride = null;  // manually typed by user (null = use GPS address)
 let geocodePending = false;
 let capturedPhotos = [];     // { blob, filename, objectUrl }
 
+// Job info (persisted in localStorage)
+let jobName  = localStorage.getItem('ftc_job_name')  || '';
+let crewName = localStorage.getItem('ftc_crew_name') || '';
+
 // Zoom
 let currentZoom    = 1;
 let minZoom        = 1;
@@ -25,7 +29,8 @@ const BG_ICONS = { black: '■', white: '□', none: '◇' };
 let video, overlayDiv, overlayTextEl, shutterBtn, flashBtn, bgBtn,
     galleryBtn, galleryBadge, statusBar, captureFlash,
     galleryPanel, galleryGrid, galleryCount,
-    addrModal, addrInput, zoomPill;
+    addrModal, addrInput, zoomPill,
+    jobModal, jobInput, crewInput;
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -45,6 +50,9 @@ document.addEventListener('DOMContentLoaded', () => {
   addrModal      = document.getElementById('addr-modal');
   addrInput      = document.getElementById('addr-input');
   zoomPill       = document.getElementById('zoom-pill');
+  jobModal       = document.getElementById('job-modal');
+  jobInput       = document.getElementById('job-input');
+  crewInput      = document.getElementById('crew-input');
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     showStatus('Camera requires HTTPS — open via https://', 0);
@@ -59,10 +67,13 @@ document.addEventListener('DOMContentLoaded', () => {
   zoomPill.addEventListener('click', cycleZoomPreset);
   setInterval(updateOverlayPreview, 1000);
 
-  shutterBtn.addEventListener('click',  capturePhoto);
-  flashBtn.addEventListener('click',    toggleFlash);
-  bgBtn.addEventListener('click',       cycleBg);
-  galleryBtn.addEventListener('click',  openGallery);
+  shutterBtn.addEventListener('click',   capturePhoto);
+  flashBtn.addEventListener('click',     toggleFlash);
+  bgBtn.addEventListener('click',        cycleBg);
+  galleryBtn.addEventListener('click',   openGallery);
+  const jobBtn = document.getElementById('job-btn');
+  jobBtn.addEventListener('click', openJobModal);
+  jobBtn.classList.toggle('active', !!(jobName || crewName));
 
   // Gallery panel
   document.getElementById('close-gallery-btn').addEventListener('click',  closeGallery);
@@ -76,6 +87,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('addr-gps-btn').addEventListener('click',    resetToGpsAddress);
   addrModal.addEventListener('click', e => { if (e.target === addrModal) closeAddrModal(); });
   addrInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveAddress(); });
+
+  // Job modal
+  document.getElementById('job-save-btn').addEventListener('click',   saveJobInfo);
+  document.getElementById('job-cancel-btn').addEventListener('click', closeJobModal);
+  jobModal.addEventListener('click', e => { if (e.target === jobModal) closeJobModal(); });
+  [jobInput, crewInput].forEach(el =>
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') saveJobInfo(); })
+  );
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(console.error);
@@ -235,7 +254,12 @@ function buildLines() {
   const time = now.toLocaleTimeString('en-US', {
     hour: '2-digit', minute: '2-digit', second: '2-digit',
   });
-  const lines = [date, time];
+
+  const lines = [];
+  if (jobName)  lines.push(jobName);
+  if (crewName) lines.push(crewName);
+  lines.push(date, time);
+
   if (gpsPosition) {
     const { latitude: lat, longitude: lon } = gpsPosition.coords;
     lines.push(`${Math.abs(lat).toFixed(5)}° ${lat >= 0 ? 'N' : 'S'},  ${Math.abs(lon).toFixed(5)}° ${lon >= 0 ? 'E' : 'W'}`);
@@ -355,6 +379,31 @@ function resetToGpsAddress() {
   addressOverride = null;
   closeAddrModal();
   updateOverlayPreview();
+}
+
+// ─── Job / Crew modal ─────────────────────────────────────────────────────────
+function openJobModal() {
+  jobInput.value  = jobName;
+  crewInput.value = crewName;
+  jobModal.classList.remove('hidden');
+  setTimeout(() => jobInput.focus(), 50);
+}
+
+function closeJobModal() {
+  jobModal.classList.add('hidden');
+  jobInput.blur();
+  crewInput.blur();
+}
+
+function saveJobInfo() {
+  jobName  = jobInput.value.trim();
+  crewName = crewInput.value.trim();
+  localStorage.setItem('ftc_job_name',  jobName);
+  localStorage.setItem('ftc_crew_name', crewName);
+  closeJobModal();
+  updateOverlayPreview();
+  // Update button to show indicator when fields are filled
+  document.getElementById('job-btn').classList.toggle('active', !!(jobName || crewName));
 }
 
 // ─── Capture → queue ──────────────────────────────────────────────────────────
