@@ -268,6 +268,8 @@ function buildLines() {
   } else {
     lines.push('Acquiring GPS…');
   }
+  lines.push('Renova Renewables');
+  lines.push('\u00A9 ' + new Date().getFullYear() + ' Renova Renewables. Licensed use only.');
   return lines;
 }
 
