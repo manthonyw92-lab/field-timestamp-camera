@@ -1,3 +1,9 @@
+/*!
+ * Field Timestamp Camera — PWA
+ * © 2026 Renova Renewables. All rights reserved.
+ * Licensed use only. Unauthorized copying, modification, or distribution
+ * of this software, via any medium, is strictly prohibited.
+ */
 'use strict';
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -268,8 +274,6 @@ function buildLines() {
   } else {
     lines.push('Acquiring GPS…');
   }
-  lines.push('Renova Renewables');
-  lines.push('\u00A9 ' + new Date().getFullYear() + ' Renova Renewables. Licensed use only.');
   return lines;
 }
 
